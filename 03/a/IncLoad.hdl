@@ -1,0 +1,10 @@
+CHIP IncLoad {
+    IN in[16], load, inc;
+    OUT out[16];
+
+    PARTS:
+    Inc16(in = regout, out = incout);
+    Mux16(a = incout, b = in, sel = load, out = muxout);
+    Or(a = load, b = inc, out = orout);
+    Register(in = muxout, load = orout, out = out, out = regout);
+}
