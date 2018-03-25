@@ -287,3 +287,33 @@ let comparisonOp: (ComparisonOp) -> String = { op in
 
     return retVal
 }
+
+let label: (String) -> String = { label in
+    return """
+    // label \(label)
+    (\(label))
+    // ~label \(label)
+    """
+}
+
+let goto: (String) -> String = { label in
+    return """
+    // goto \(label)
+    @\(label)
+    0; JMP
+    // ~goto \(label)
+    """
+}
+
+let ifGoto: (String) -> String = { label in
+    return """
+    // if-goto \(label)
+    @SP
+    M = M - 1
+    A = M
+    D = M
+    @\(label)
+    D; JNE
+    // ~if-goto \(label)
+    """
+}

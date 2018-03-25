@@ -9,7 +9,7 @@ func generateAsmCode(from vmCode: [String], forFileName fileName: String) -> [St
             continue
         }
 
-        let vmCodeLineTokens: [Substring] = vmCodeLine.split(separator: " ")
+        let vmCodeLineTokens: [Substring] = trimmedLine.split(separator: " ")
         switch vmCodeLineTokens[0] {
         case "push":
             asmCode.append(pushAsmCode(from: vmCodeLineTokens, forFileName: fileName))
@@ -21,6 +21,12 @@ func generateAsmCode(from vmCode: [String], forFileName fileName: String) -> [St
             asmCode.append(oneParamOpAsmCode(from: vmCodeLineTokens[0]))
         case "lt", "gt", "eq":
             asmCode.append(comparisonOpAsmCode(from: vmCodeLineTokens[0]))
+        case "label":
+            asmCode.append(labelAsmCode(from: vmCodeLineTokens))
+        case "goto":
+            asmCode.append(gotoAsmCode(from: vmCodeLineTokens))
+        case "if-goto":
+            asmCode.append(ifGotoAsmCode(from: vmCodeLineTokens))
         default:
             continue
         }
@@ -107,6 +113,30 @@ func comparisonOpAsmCode(from comparisonOpVmCodeToken: Substring) -> String {
         return ""
     }
     return comparisonOp(comparisonOp1)
+}
+
+func labelAsmCode(from labelVmCodeTokens: [Substring]) -> String {
+    guard labelVmCodeTokens.count == 2 else {
+        return ""
+    }
+
+    return label(String.init(labelVmCodeTokens[1]))
+}
+
+func gotoAsmCode(from gotoVmCodeTokens: [Substring]) -> String {
+    guard gotoVmCodeTokens.count == 2 else {
+        return ""
+    }
+
+    return goto(String.init(gotoVmCodeTokens[1]))
+}
+
+func ifGotoAsmCode(from ifGotoVmCodeTokens: [Substring]) -> String {
+    guard ifGotoVmCodeTokens.count == 2 else {
+        return ""
+    }
+
+    return ifGoto(String.init(ifGotoVmCodeTokens[1]))
 }
 
 func go() -> Void {
