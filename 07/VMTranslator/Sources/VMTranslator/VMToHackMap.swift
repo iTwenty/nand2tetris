@@ -317,3 +317,137 @@ let ifGoto: (String) -> String = { label in
     // ~if-goto \(label)
     """
 }
+
+let function: (String, Int) -> String = { name, localCount in
+    var retVal = "// function \(name) \(localCount)\n"
+    retVal += "(\(name))\n"
+    for i in 0..<localCount {
+        retVal += pushConstant(0)
+        retVal += "\n"
+    }
+    retVal += "// ~function \(name) \(localCount)\n"
+    return retVal
+}
+
+let retrun: () -> String = {
+    return """
+    // return
+    @LCL
+    D = M
+    @R13
+    M = D
+    @R14
+    M = D
+    @5
+    D = A
+    @R14
+    M = M - D
+    A = M
+    D = M
+    @R14
+    M = D
+    \(popAddress(15))
+    @R15
+    D = M
+    @ARG
+    A = M
+    M = D
+    @ARG
+    D = M + 1
+    @SP
+    M = D
+    @4
+    D = A
+    @R13
+    M = M - D
+    A = M
+    D = M
+    @LCL
+    M = D
+    @R13
+    M = M + 1
+    A = M
+    D = M
+    @ARG
+    M = D
+    @R13
+    M = M + 1
+    A = M
+    D = M
+    @THIS
+    M = D
+    @R13
+    M = M + 1
+    A = M
+    D = M
+    @THAT
+    M = D
+    @R14
+    A = M
+    0; JMP
+    // ~return
+    """
+}
+
+var callReturnSymbolCount: Int = 0
+
+let call: (String, Int) -> String = { name, argCount in
+    let retVal = """
+    // call \(name) \(argCount)
+    @RET-\(callReturnSymbolCount)
+    D = A
+    @R13
+    M = D
+    \(pushAddress(13))
+    @LCL
+    D = M
+    @R13
+    M = D
+    \(pushAddress(13))
+    @ARG
+    D = M
+    @R13
+    M = D
+    \(pushAddress(13))
+    @THIS
+    D = M
+    @R13
+    M = D
+    \(pushAddress(13))
+    @THAT
+    D = M
+    @R13
+    M = D
+    \(pushAddress(13))
+    @SP
+    D = M
+    @5
+    D = D - A
+    @\(argCount)
+    D = D - A
+    @ARG
+    M = D
+    @SP
+    D = M
+    @LCL
+    M = D
+    @\(name)
+    0; JMP
+    (RET-\(callReturnSymbolCount))
+    // ~call \(name) \(argCount)
+    """
+
+    callReturnSymbolCount = callReturnSymbolCount + 1
+
+    return retVal
+}
+
+let bootStrap: () -> String = {
+    return """
+    @256
+    D = A
+    @SP
+    M = D
+    \(call("Sys.init", 0))
+    """
+}

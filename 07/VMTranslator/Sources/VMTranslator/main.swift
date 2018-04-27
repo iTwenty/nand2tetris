@@ -27,6 +27,12 @@ func generateAsmCode(from vmCode: [String], forFileName fileName: String) -> [St
             asmCode.append(gotoAsmCode(from: vmCodeLineTokens))
         case "if-goto":
             asmCode.append(ifGotoAsmCode(from: vmCodeLineTokens))
+        case "function":
+            asmCode.append(functionAsmCode(from: vmCodeLineTokens))
+        case "return":
+            asmCode.append(returnAsmCode(from: vmCodeLineTokens[0]))
+        case "call":
+            asmCode.append(callAsmCode(from: vmCodeLineTokens))
         default:
             continue
         }
@@ -139,14 +145,35 @@ func ifGotoAsmCode(from ifGotoVmCodeTokens: [Substring]) -> String {
     return ifGoto(String.init(ifGotoVmCodeTokens[1]))
 }
 
-func go() -> Void {
-    guard CommandLine.argc == 2 else {
-        print("Usage : VMTranslator <input-file>")
-        exit(1)
+func functionAsmCode(from functionVmCodeTokens: [Substring]) -> String {
+    guard functionVmCodeTokens.count == 3 else {
+        return ""
     }
 
-    let vmFilePath = CommandLine.arguments[1]
-    let vmFileURL = URL(fileURLWithPath: vmFilePath)
+    guard let localCount = Int(functionVmCodeTokens[2]) else {
+        return ""
+    }
+
+    return function(String.init(functionVmCodeTokens[1]), localCount)
+}
+
+func returnAsmCode(from returnVmCodeToken: Substring) -> String {
+    return retrun();
+}
+
+func callAsmCode(from callVmCodeTokens: [Substring]) -> String {
+    guard callVmCodeTokens.count == 3 else {
+        return ""
+    }
+
+    guard let argCount = Int(callVmCodeTokens[2]) else {
+        return ""
+    }
+
+    return call(String.init(callVmCodeTokens[1]), argCount)
+}
+
+func generateAsmCode(from vmFileURL: URL) -> [String] {
     guard FileManager.default.fileExists(atPath: vmFileURL.path) else {
         print("No such file : \(vmFileURL.path)")
         exit(2)
@@ -157,29 +184,74 @@ func go() -> Void {
         exit(2)
     }
 
-    let asmFileURL: URL = vmFileURL.deletingPathExtension().appendingPathExtension("asm")
+    let fileName = vmFileURL.deletingPathExtension().lastPathComponent
+
+    let vmLines = vm.components(separatedBy: .newlines)
+    let asmLines = generateAsmCode(from: vmLines, forFileName: fileName)
+
+    return asmLines;
+}
+
+func generateAsmFile(from asmCode: [String], atUrl asmFileURL: URL) -> Void {
     FileManager.default.createFile(atPath: asmFileURL.path, contents: nil, attributes: nil)
     guard let asmFileHandle = try? FileHandle(forWritingTo: asmFileURL) else {
         print("Failed to open asm file : \(asmFileURL.path)")
         exit(2)
     }
 
-    let asmFileName = asmFileURL.deletingPathExtension().lastPathComponent
-
-    let vmLines = vm.components(separatedBy: .newlines)
-    let asmLines = generateAsmCode(from: vmLines, forFileName: asmFileName)
-
-    asmLines.forEach { (line) in
-        guard let lineData = line.data(using: .utf8) else {
-            print("Failed to write asm line : \(line)")
-            asmFileHandle.closeFile()
-            exit(2)
-        }
-
-        asmFileHandle.write(lineData)
-        asmFileHandle.write("\n".data(using: .utf8)!)
+    write(line: bootStrap(), to: asmFileHandle)
+    asmCode.forEach { (line) in
+        write(line: line, to: asmFileHandle)
     }
+
     asmFileHandle.closeFile()
+}
+
+func generateAsmFile(from vmFileURL: URL) -> Void {
+    let asmLines: [String] = generateAsmCode(from: vmFileURL)
+    generateAsmFile(from: asmLines, atUrl: vmFileURL.deletingPathExtension().appendingPathExtension("asm"))
+}
+
+func generateAsmFileForVmFiles(at url: URL) -> Void {
+    if url.hasDirectoryPath {
+        let enumerator = FileManager.default.enumerator(at: url,
+                                                        includingPropertiesForKeys: nil,
+                                                        options: .skipsHiddenFiles,
+                                                        errorHandler: nil)
+        var asmLines: [String] = []
+        while let element = enumerator?.nextObject() as? URL {
+            if element.pathExtension == "vm" {
+                asmLines.insert(contentsOf: generateAsmCode(from: element), at: asmLines.endIndex)
+            }
+        }
+        generateAsmFile(from: asmLines, atUrl: url.appendingPathComponent(url.lastPathComponent).appendingPathExtension("asm"))
+    } else if url.pathExtension == "vm" {
+        generateAsmFile(from: url)
+    } else {
+        // Not a vm file or a directory. Do nothing
+    }
+}
+
+func write(line: String, to fileHandle: FileHandle) -> Void {
+    guard let lineData = line.data(using: .utf8) else {
+        print("Failed to write asm line : \(line)")
+        fileHandle.closeFile()
+        exit(2)
+    }
+
+    fileHandle.write(lineData)
+    fileHandle.write("\n".data(using: .utf8)!)
+}
+
+func go() -> Void {
+    guard CommandLine.argc == 2 else {
+        print("Usage : VMTranslator <input-file>")
+        exit(1)
+    }
+
+    let cmdPath = CommandLine.arguments[1]
+    let cmdURL = URL(fileURLWithPath: cmdPath)
+    generateAsmFileForVmFiles(at: cmdURL)
 }
 
 go()
