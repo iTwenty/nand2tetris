@@ -1,0 +1,10 @@
+class Main {
+    function void main() {
+        var int dividend;
+        var FizzBuzz fb;
+        let dividend = 15;
+        let fb = FizzBuzz.new(dividend, 3, 5);
+        do fb.fizzTheBuzz("lol", "bro");
+        return;
+    }
+}

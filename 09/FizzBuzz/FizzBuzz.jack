@@ -1,0 +1,54 @@
+class FizzBuzz {
+    field int fDividend, fDivisor1, fDivisor2;
+
+    constructor FizzBuzz new(int dividend, int divisor1, int divisor2) {
+        let fDividend = dividend;
+        let fDivisor1 = divisor1;
+        let fDivisor2 = divisor2;
+        return this;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    method void fizzTheBuzz(String fizzString, String buzzString) {
+        var int counter;
+        let counter = 1;
+
+        if(fizzString = null) {
+            let fizzString = "Fizz";
+        }
+        if(buzzString = null) {
+            let buzzString = "Buzz";
+        }
+
+        while((counter < fDividend) | (counter = fDividend)) {
+            if((FizzBuzz.modulo(counter, fDivisor1) = 0) & (FizzBuzz.modulo(counter, fDivisor2) = 0)) {
+                do Output.printString(fizzString);
+                do Output.printString(buzzString);
+            } else {
+                if(FizzBuzz.modulo(counter, fDivisor1) = 0) {
+                    do Output.printString(fizzString);
+                } else {
+                    if(FizzBuzz.modulo(counter, fDivisor2) = 0) {
+                        do Output.printString(buzzString);
+                    } else {
+                        do Output.printInt(counter);
+                    }
+                }
+            }
+            do Output.println();
+            let counter = counter + 1;
+        }
+        return;
+    }
+
+    function int modulo(int a, int b) {
+        while((a > b) | (a = b)) {
+            let a = a - b;
+        }
+        return a;
+    }
+}
