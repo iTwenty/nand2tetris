@@ -1,34 +1,6 @@
 import Foundation
 
-/**
- Cleans the Jack source code of comments, whitespaces etc
- and returns only the actual source needed for parsing
- */
-func cleanJackSource(_ source: String) -> String {
-    let lines = source.components(separatedBy: .newlines)
-    var cleanedLines :String = ""
-    for line in lines {
-        var cleanedLine = line
-        // Remove portion of line after //
-        if let range = cleanedLine.range(of: "//") {
-            cleanedLine = String(cleanedLine[..<range.lowerBound])
-        }
-        cleanedLine = cleanedLine.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Exclude empty lines and comments in /**/ blocks.
-        if cleanedLine.isEmpty
-            || cleanedLine.hasPrefix("/*")
-            || cleanedLine.hasPrefix("*") {
-            continue
-        }
-        cleanedLines.append(cleanedLine)
-    }
-    return cleanedLines
-}
-
-/**
- Entry point of the program
- */
-func go() {
+func writeTokenizerXml() {
     let input = CommandLine.arguments[1]
     guard let fileHandler = try? FileHandler(withPath: input, inputExt: "jack", outputExt: "gen.xml") else {
         exit(1)
@@ -37,15 +9,39 @@ func go() {
         guard let jackSource = try? fileHandler.contents(ofFile: file) else {
             exit(2)
         }
-        let cleanedJackSource = cleanJackSource(jackSource)
-        let tokens = JackTokenizer.parseJackSource(cleanedJackSource)
-        let parserXml = JackTokenizer.generateXml(tokens)
+        let tokens = JackTokenizer.tokenizeJackSource(jackSource)
+        let tokenizerXml = JackTokenizer.generateXml(tokens)
         do {
-            try fileHandler.write(output: parserXml, forInputFile: file)
+            try fileHandler.write(output: tokenizerXml, forInputFile: file)
         } catch {
             exit(3)
         }
     }
 }
 
-go()
+func writeParserXml() {
+    let clazz =
+"""
+class Main {
+    field int a, b;
+    static String c, d;
+
+    function int main(int argc, Array argv) {
+        var float f, g;
+    }
+
+    method void foo() {
+        var Car c;
+        var Bus bus;
+    }
+}
+"""
+    do {
+        try print(JackParser.parseTokens(JackTokenizer.tokenizeJackSource(clazz)))
+    } catch {
+        print("\(error)")
+        exit(1)
+    }
+}
+
+writeParserXml()

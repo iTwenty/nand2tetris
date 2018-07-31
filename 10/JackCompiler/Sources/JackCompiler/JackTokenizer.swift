@@ -1,56 +1,17 @@
 import Foundation
 
-enum Keyword : String {
-    case `class`, `method`, `function`, `constructor`, `int`, `boolean`, `char`, `void`, `var`,
-    `static`, `field`, `let`, `do`, `if`, `else`, `while`, `return`, `true`, `false`, `null`, `this`
-}
-
-enum TokenType {
-    case keyword(Keyword), symbol(Character), identifier(String), intConstant(Int), stringConstant(String)
-
-    func xml() -> String {
-        switch self {
-        case let .keyword(k):
-            return "<keyword>\(k)</keyword>"
-        case let .symbol(c):
-            return "<symbol>\(TokenType.xmlSafe(c))</symbol>"
-        case let .identifier(i):
-            return "<identifier>\(i)</identifier>"
-        case let .intConstant(i):
-            return "<integerConstant>\(i)</integerConstant>"
-        case let .stringConstant(s):
-            return "<stringConstant>\(s)</stringConstant>"
-        }
-    }
-
-    private static func xmlSafe(_ c: Character) -> String {
-        if c == "<" {
-            return "&lt;"
-        }
-        if c == ">" {
-            return "&gt;"
-        }
-        if c == "\"" {
-            return "&quot;"
-        }
-        if c == "&" {
-            return "&amp;"
-        }
-        return String(c)
-    }
-}
-
 class JackTokenizer {
 
     /**
-     Parses the Jack source to identify and return individual tokens
+     Tokenizes the Jack source to identify and return individual tokens
      */
-    static func parseJackSource(_ source: String) -> [TokenType] {
+    static func tokenizeJackSource(_ source: String) -> [TokenType] {
+        let cleanedSource = cleanJackSource(source)
         var tokens: [TokenType] = []
         var currentToken: String = ""
         var isInsideString: Bool = false
         // Iterate over the source character by character
-        for c in source.unicodeScalars {
+        for c in cleanedSource.unicodeScalars {
             if c == "\"" {
                 // We are entering or exiting a string constant
                 if isInsideString {
@@ -71,7 +32,7 @@ class JackTokenizer {
                 // We are neither inside string, nor did we encounter an alphanumeric character.
                 if !currentToken.isEmpty {
                     // Time to parse the current token if it's non empty
-                    tokens.append(parseToken(currentToken))
+                    tokens.append(tokenize(currentToken))
                     // We consumed the token. So we empty it before proceeding.
                     currentToken = ""
                 }
@@ -86,9 +47,9 @@ class JackTokenizer {
     }
 
     /**
-     Parses the passed token to correct type
+     tokenize the passed string to correct token type
      */
-    private static func parseToken(_ token: String) -> TokenType {
+    private static func tokenize(_ token: String) -> TokenType {
         if let k = Keyword.init(rawValue: token) {
             return .keyword(k)
         }
@@ -96,6 +57,31 @@ class JackTokenizer {
             return .intConstant(i)
         }
         return .identifier(token)
+    }
+
+    /**
+     Cleans the Jack source code of comments, whitespaces etc
+     and returns only the actual source needed for parsing
+     */
+    private static func cleanJackSource(_ source: String) -> String {
+        let lines = source.components(separatedBy: .newlines)
+        var cleanedLines :String = ""
+        for line in lines {
+            var cleanedLine = line
+            // Remove portion of line after //
+            if let range = cleanedLine.range(of: "//") {
+                cleanedLine = String(cleanedLine[..<range.lowerBound])
+            }
+            cleanedLine = cleanedLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Exclude empty lines and comments in /**/ blocks.
+            if cleanedLine.isEmpty
+                || cleanedLine.hasPrefix("/*")
+                || cleanedLine.hasPrefix("*") {
+                continue
+            }
+            cleanedLines.append(cleanedLine)
+        }
+        return cleanedLines
     }
 
     /**
