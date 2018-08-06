@@ -22,7 +22,7 @@ class JackParser {
 
     private static let typeTokens: Set<TokenType> = [.keyword(.int), .keyword(.char), .keyword(.boolean), .identifier("")]
 
-    private static let termConstants: Set<TokenType> = [.intConstant(0), .stringConstant(""), .keyword(.true), .keyword(.false),
+    private static let termTokens: Set<TokenType> = [.intConstant(0), .stringConstant(""), .keyword(.true), .keyword(.false),
                                                      .keyword(.null), .keyword(.this), .identifier(""), .symbol("(" as Character),
                                                      .symbol("-" as Character), .symbol("~" as Character)]
 
@@ -239,7 +239,7 @@ class JackParser {
         var returnStmt = tabs() + "<returnStatement>\n"
         indentLevel += 1
         returnStmt += try tabs() + eat(expectedTokens: [.keyword(.return)]).xml() + "\n"
-        if let peekedToken = tokenIterator.peek(), set(termConstants, contains: peekedToken) {
+        if let peekedToken = tokenIterator.peek(), set(termTokens, contains: peekedToken) {
             returnStmt += try parseExpression()
         }
         returnStmt += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
@@ -264,7 +264,33 @@ class JackParser {
     private static func parseTerm() throws -> String {
         var term = tabs() + "<term>\n"
         indentLevel += 1
-        term += try tabs() + eat(expectedTokens: [.identifier(""), .keyword(.this)]).xml() + "\n"
+        let tokenToEat = try eat(expectedTokens: termTokens)
+        term += tabs() + tokenToEat.xml() + "\n"
+        if set([.symbol("(")], contains: tokenToEat) {
+            term += try parseExpression()
+            term += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
+        } else if set([.symbol("-"), .symbol("~")], contains: tokenToEat) {
+            term += try parseTerm()
+        } else if set([.identifier("")], contains: tokenToEat) {
+            if let peekedToken = tokenIterator.peek(), set([.symbol("["), .symbol("."), .symbol("(")], contains: peekedToken) {
+                switch peekedToken {
+                case .symbol("["):
+                    term += try tabs() + eat(expectedTokens: [.symbol("[")]).xml() + "\n"
+                    term += try parseExpression()
+                    term += try tabs() + eat(expectedTokens: [.symbol("]")]).xml() + "\n"
+                case .symbol("."):
+                    term += try tabs() + eat(expectedTokens: [.symbol(".")]).xml() + "\n"
+                    term += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+                    fallthrough
+                case .symbol("("):
+                    term += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+                    term += try parseExpressionList()
+                    term += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
+                default:
+                    break // Will never reach here
+                }
+            }
+        }
         indentLevel -= 1
         term += tabs() + "</term>\n"
         return term
@@ -273,7 +299,7 @@ class JackParser {
     private static func parseExpressionList() throws -> String {
         var expressionList = tabs() + "<expressionList>\n"
         indentLevel += 1
-        if let peekedToken = tokenIterator.peek(), set(termConstants, contains: peekedToken) {
+        if let peekedToken = tokenIterator.peek(), set(termTokens, contains: peekedToken) {
             expressionList += try parseExpression()
             while let peekedToken = tokenIterator.peek(), set([.symbol(",")], contains: peekedToken) {
                 expressionList += try tabs() + eat(expectedTokens: [.symbol(",")]).xml() + "\n"
