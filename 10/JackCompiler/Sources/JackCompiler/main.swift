@@ -31,7 +31,7 @@ func writeParserXml() {
         let tokens = JackTokenizer.tokenizeJackSource(jackSource)
         do {
             let parserXml = try JackParser.parseTokens(tokens)
-            try fileHandler.write(output: parserXml, forInputFile: file)
+            //try fileHandler.write(output: parserXml, forInputFile: file)
         } catch {
             print("\(file.lastPathComponent) - \(error)")
             exit(3)

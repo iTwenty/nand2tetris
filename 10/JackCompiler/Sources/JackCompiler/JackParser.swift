@@ -30,22 +30,20 @@ class JackParser {
                                                    .symbol("|"), .symbol("<"), .symbol(">"), .symbol("="), ]
 
     private static var tokenIterator: PeekingIterator<[TokenType]> = [].makePeekingIterator()
-    private static var indentLevel: UInt = 1
 
     static func parseTokens(_ tokens: [TokenType]) throws -> String {
         var s: String = ""
         tokenIterator = tokens.makePeekingIterator()
-        indentLevel = 0
         s += try parseClass()
         return s
     }
 
     private static func parseClass() throws -> String {
-        var clazz: String = tabs() + "<class>\n"
-        indentLevel += 1
-        clazz += try tabs() + eat(expectedTokens: [.keyword(.class)]).xml() + "\n"
-        clazz += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
-        clazz += try tabs() + eat(expectedTokens: [.symbol("{")]).xml() + "\n"
+        SymbolTable.resetSymbols()
+        var clazz: String = ""
+        try eat(expectedTokens: [.keyword(.class)])
+        try eat(expectedTokens: [.identifier("")])
+        try eat(expectedTokens: [.symbol("{")])
         let expectedClassVarDecTokens: Set<TokenType> = [.keyword(.static), .keyword(.field)]
         while let peekedToken = tokenIterator.peek(), set(expectedClassVarDecTokens, contains: peekedToken) {
             clazz += try parseClassVarDec()
@@ -54,93 +52,79 @@ class JackParser {
         while let peekedToken = tokenIterator.peek(), set(expectedSubroutineDecTokens, contains: peekedToken) {
             clazz += try parseSubroutineDec()
         }
-        clazz += try tabs() + eat(expectedTokens: [.symbol("}")]).xml() + "\n"
-        indentLevel -= 1
-        clazz += tabs() + "</class>\n"
+        try eat(expectedTokens: [.symbol("}")])
         return clazz
     }
 
     private static func parseClassVarDec() throws -> String {
-        var classVarDec = tabs() + "<classVarDec>\n"
-        indentLevel += 1
-        classVarDec += try tabs() + eat(expectedTokens: [.keyword(.static), .keyword(.field)]).xml() + "\n"
-        classVarDec += try tabs() + eat(expectedTokens: typeTokens).xml() + "\n"
-        classVarDec += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+        let classVarKind = try eat(expectedTokens: [.keyword(.static), .keyword(.field)])
+        let classVarType = try eat(expectedTokens: typeTokens)
+        let classVarName = try eat(expectedTokens: [.identifier("")])
+        SymbolTable.addSymbol(withName: classVarName, type: classVarType, kind: classVarKind)
         while let peekedToken = tokenIterator.peek(), set([.symbol(",")], contains: peekedToken) {
-            classVarDec += try tabs() + eat(expectedTokens: [.symbol(",")]).xml() + "\n"
-            classVarDec += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol(",")])
+            let classVarName = try eat(expectedTokens: [.identifier("")])
+            SymbolTable.addSymbol(withName: classVarName, type: classVarType, kind: classVarKind)
         }
-        classVarDec += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
-        indentLevel -= 1
-        classVarDec += tabs() + "</classVarDec>\n"
-        return classVarDec
+        try eat(expectedTokens: [.symbol(";")])
+        return ""
     }
 
     private static func parseSubroutineDec() throws -> String {
-        var subroutineDec = tabs() + "<subroutineDec>\n"
-        indentLevel += 1
-        subroutineDec += try tabs() + eat(expectedTokens: [.keyword(.constructor), .keyword(.function), .keyword(.method)]).xml() + "\n"
-        subroutineDec += try tabs() + eat(expectedTokens: typeTokens.union([.keyword(.void)])).xml() + "\n"
-        subroutineDec += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
-        subroutineDec += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+        SymbolTable.resetMethodSymbols()
+        var subroutineDec = ""
+        try eat(expectedTokens: [.keyword(.constructor), .keyword(.function), .keyword(.method)])
+        try eat(expectedTokens: typeTokens.union([.keyword(.void)]))
+        try eat(expectedTokens: [.identifier("")])
+        try eat(expectedTokens: [.symbol("(")])
         subroutineDec += try parseParameterList()
-        subroutineDec += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol(")")])
         subroutineDec += try parseSubroutineBody()
-        indentLevel -= 1
-        subroutineDec += tabs() + "</subroutineDec>\n"
         return subroutineDec
     }
 
     private static func parseParameterList() throws -> String {
-        var parameterList = tabs() + "<parameterList>\n"
-        indentLevel += 1
         if let peekedToken = tokenIterator.peek(), set(typeTokens, contains: peekedToken) {
-            parameterList += try tabs() + eat(expectedTokens: typeTokens).xml() + "\n"
-            parameterList += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+            let argumentType = try eat(expectedTokens: typeTokens)
+            let argumentName = try eat(expectedTokens: [.identifier("")])
+            SymbolTable.addSymbol(withName: argumentName, type: argumentType, kind: .argument)
             while let peekedToken = tokenIterator.peek(), set([.symbol(",")], contains: peekedToken) {
-                parameterList += try tabs() + eat(expectedTokens: [.symbol(",")]).xml() + "\n"
-                parameterList += try tabs() + eat(expectedTokens: typeTokens).xml() + "\n"
-                parameterList += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+                try eat(expectedTokens: [.symbol(",")])
+                let argumentType = try eat(expectedTokens: typeTokens)
+                let argumentName = try eat(expectedTokens: [.identifier("")])
+                SymbolTable.addSymbol(withName: argumentName, type: argumentType, kind: .argument)
             }
         }
-        indentLevel -= 1
-        parameterList += tabs() + "</parameterList>\n"
-        return parameterList
+        return ""
     }
 
     private static func parseSubroutineBody() throws -> String {
-        var subroutineBody = tabs() + "<subroutineBody>\n"
-        indentLevel += 1
-        subroutineBody += try tabs() + eat(expectedTokens: [.symbol("{")]).xml() + "\n"
+        var subroutineBody = ""
+        try eat(expectedTokens: [.symbol("{")])
         while let peekedToken = tokenIterator.peek(), set([.keyword(.var)], contains: peekedToken) {
             subroutineBody += try parseVarDec()
         }
         subroutineBody += try parseStmts()
-        subroutineBody += try tabs() + eat(expectedTokens: [.symbol("}")]).xml() + "\n"
-        indentLevel -= 1
-        subroutineBody += tabs() + "</subroutineBody>\n"
+        try eat(expectedTokens: [.symbol("}")])
         return subroutineBody
     }
 
     private static func parseVarDec() throws -> String {
-        var varDec = tabs() + "<varDec>\n"
-        indentLevel += 1
-        varDec += try tabs() + eat(expectedTokens: [.keyword(.var)]).xml() + "\n"
-        varDec += try tabs() + eat(expectedTokens: typeTokens).xml() + "\n"
-        varDec += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+        try eat(expectedTokens: [.keyword(.var)])
+        let varType = try eat(expectedTokens: typeTokens)
+        let varName = try eat(expectedTokens: [.identifier("")])
+        SymbolTable.addSymbol(withName: varName, type: varType, kind: .var)
         while let peekedToken = tokenIterator.peek(), set([.symbol(",")], contains: peekedToken) {
-            varDec += try tabs() + eat(expectedTokens: [.symbol(",")]).xml() + "\n"
-            varDec += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol(",")])
+            let varName = try eat(expectedTokens: [.identifier("")])
+            SymbolTable.addSymbol(withName: varName, type: varType, kind: .var)
         }
-        varDec += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
-        indentLevel -= 1
-        varDec += tabs() + "</varDec>\n"
-        return varDec
+        try eat(expectedTokens: [.symbol(";")])
+        return ""
     }
 
     private static func parseStmts() throws -> String {
-        var stmts = tabs() + "<statements>\n"
-        indentLevel += 1
+        var stmts = ""
         let expectedStmtTokens: Set<TokenType> = [.keyword(.if), .keyword(.let), .keyword(.while), .keyword(.do), .keyword(.return)]
         while let peekedToken = tokenIterator.peek(), set(expectedStmtTokens, contains: peekedToken) {
             switch peekedToken {
@@ -158,159 +142,133 @@ class JackParser {
                 break // Will never reach here
             }
         }
-        indentLevel -= 1
-        stmts += tabs() + "</statements>\n"
         return stmts
     }
 
     private static func parseIfStmt() throws -> String {
-        var ifStmt = tabs() + "<ifStatement>\n"
-        indentLevel += 1
-        ifStmt += try tabs() + eat(expectedTokens: [.keyword(.if)]).xml() + "\n"
-        ifStmt += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+        var ifStmt = ""
+        try eat(expectedTokens: [.keyword(.if)])
+        try eat(expectedTokens: [.symbol("(")])
         ifStmt += try parseExpression()
-        ifStmt += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
-        ifStmt += try tabs() + eat(expectedTokens: [.symbol("{")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol(")")])
+        try eat(expectedTokens: [.symbol("{")])
         ifStmt += try parseStmts()
-        ifStmt += try tabs() + eat(expectedTokens: [.symbol("}")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol("}")])
         if let peekedToken = tokenIterator.peek(), set([.keyword(.else)], contains: peekedToken) {
-            ifStmt += try tabs() + eat(expectedTokens: [.keyword(.else)]).xml() + "\n"
-            ifStmt += try tabs() + eat(expectedTokens: [.symbol("{")]).xml() + "\n"
+            try eat(expectedTokens: [.keyword(.else)])
+            try eat(expectedTokens: [.symbol("{")])
             ifStmt += try parseStmts()
-            ifStmt += try tabs() + eat(expectedTokens: [.symbol("}")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol("}")])
         }
-        indentLevel -= 1
-        ifStmt += tabs() + "</ifStatement>\n"
         return ifStmt
     }
 
     private static func parseLetStmt() throws -> String {
-        var letStmt = tabs() + "<letStatement>\n"
-        indentLevel += 1
-        letStmt += try tabs() + eat(expectedTokens: [.keyword(.let)]).xml() + "\n"
-        letStmt += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+        var letStmt = ""
+        try eat(expectedTokens: [.keyword(.let)])
+        try eat(expectedTokens: [.identifier("")])
         if let peekedToken = tokenIterator.peek(), set([.symbol("[")], contains: peekedToken) {
-            letStmt += try tabs() + eat(expectedTokens: [.symbol("[")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol("[")])
             letStmt += try parseExpression()
-            letStmt += try tabs() + eat(expectedTokens: [.symbol("]")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol("]")])
         }
-        letStmt += try tabs() + eat(expectedTokens: [.symbol("=")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol("=")])
         letStmt += try parseExpression()
-        letStmt += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
-        indentLevel -= 1
-        letStmt += tabs() + "</letStatement>\n"
+        try eat(expectedTokens: [.symbol(";")])
         return letStmt
     }
 
     private static func parseWhileStmt() throws -> String {
-        var whileStmt = tabs() + "<whileStatement>\n"
-        indentLevel += 1
-        whileStmt += try tabs() + eat(expectedTokens: [.keyword(.while)]).xml() + "\n"
-        whileStmt += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+        var whileStmt = ""
+        try eat(expectedTokens: [.keyword(.while)])
+        try eat(expectedTokens: [.symbol("(")])
         whileStmt += try parseExpression()
-        whileStmt += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
-        whileStmt += try tabs() + eat(expectedTokens: [.symbol("{")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol(")")])
+        try eat(expectedTokens: [.symbol("{")])
         whileStmt += try parseStmts()
-        whileStmt += try tabs() + eat(expectedTokens: [.symbol("}")]).xml() + "\n"
-        indentLevel -= 1
-        whileStmt += tabs() + "</whileStatement>\n"
+        try eat(expectedTokens: [.symbol("}")])
         return whileStmt
     }
 
     private static func parseDoStmt() throws -> String {
-        var doStmt = tabs() + "<doStatement>\n"
-        indentLevel += 1
-        doStmt += try tabs() + eat(expectedTokens: [.keyword(.do)]).xml() + "\n"
-        doStmt += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+        var doStmt = ""
+        try eat(expectedTokens: [.keyword(.do)])
+        try eat(expectedTokens: [.identifier("")])
         if let peekedToken = tokenIterator.peek(), set([.symbol(".")], contains: peekedToken) {
-            doStmt += try tabs() + eat(expectedTokens: [.symbol(".")]).xml() + "\n"
-            doStmt += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol(".")])
+            try eat(expectedTokens: [.identifier("")])
         }
-        doStmt += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+        try eat(expectedTokens: [.symbol("(")])
         doStmt += try parseExpressionList()
-        doStmt += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
-        doStmt += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
-        indentLevel -= 1
-        doStmt += tabs() + "</doStatement>\n"
+        try eat(expectedTokens: [.symbol(")")])
+        try eat(expectedTokens: [.symbol(";")])
         return doStmt
     }
 
     private static func parseReturnStmt() throws -> String {
-        var returnStmt = tabs() + "<returnStatement>\n"
-        indentLevel += 1
-        returnStmt += try tabs() + eat(expectedTokens: [.keyword(.return)]).xml() + "\n"
+        var returnStmt = ""
+        try eat(expectedTokens: [.keyword(.return)])
         if let peekedToken = tokenIterator.peek(), set(termTokens, contains: peekedToken) {
             returnStmt += try parseExpression()
         }
-        returnStmt += try tabs() + eat(expectedTokens: [.symbol(";")]).xml() + "\n"
-        indentLevel -= 1
-        returnStmt += tabs() + "</returnStatement>\n"
+        try eat(expectedTokens: [.symbol(";")])
         return returnStmt
     }
 
     private static func parseExpression() throws -> String {
-        var expression = tabs() + "<expression>\n"
-        indentLevel += 1
+        var expression = ""
         expression += try parseTerm()
         while let peekedToken = tokenIterator.peek(), set(opTokens, contains: peekedToken) {
-            expression += try tabs() + eat(expectedTokens: opTokens).xml() + "\n"
+            try eat(expectedTokens: opTokens)
             expression += try parseTerm()
         }
-        indentLevel -= 1
-        expression += tabs() + "</expression>\n"
         return expression
     }
 
     private static func parseTerm() throws -> String {
-        var term = tabs() + "<term>\n"
-        indentLevel += 1
+        var term = ""
         let tokenToEat = try eat(expectedTokens: termTokens)
-        term += tabs() + tokenToEat.xml() + "\n"
         if set([.symbol("(")], contains: tokenToEat) {
             term += try parseExpression()
-            term += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
+            try eat(expectedTokens: [.symbol(")")])
         } else if set([.symbol("-"), .symbol("~")], contains: tokenToEat) {
             term += try parseTerm()
         } else if set([.identifier("")], contains: tokenToEat) {
             if let peekedToken = tokenIterator.peek(), set([.symbol("["), .symbol("."), .symbol("(")], contains: peekedToken) {
                 switch peekedToken {
                 case .symbol("["):
-                    term += try tabs() + eat(expectedTokens: [.symbol("[")]).xml() + "\n"
+                    try eat(expectedTokens: [.symbol("[")])
                     term += try parseExpression()
-                    term += try tabs() + eat(expectedTokens: [.symbol("]")]).xml() + "\n"
+                    try eat(expectedTokens: [.symbol("]")])
                 case .symbol("."):
-                    term += try tabs() + eat(expectedTokens: [.symbol(".")]).xml() + "\n"
-                    term += try tabs() + eat(expectedTokens: [.identifier("")]).xml() + "\n"
+                    try eat(expectedTokens: [.symbol(".")])
+                    try eat(expectedTokens: [.identifier("")])
                     fallthrough
                 case .symbol("("):
-                    term += try tabs() + eat(expectedTokens: [.symbol("(")]).xml() + "\n"
+                    try eat(expectedTokens: [.symbol("(")])
                     term += try parseExpressionList()
-                    term += try tabs() + eat(expectedTokens: [.symbol(")")]).xml() + "\n"
+                    try eat(expectedTokens: [.symbol(")")])
                 default:
                     break // Will never reach here
                 }
             }
         }
-        indentLevel -= 1
-        term += tabs() + "</term>\n"
         return term
     }
 
     private static func parseExpressionList() throws -> String {
-        var expressionList = tabs() + "<expressionList>\n"
-        indentLevel += 1
+        var expressionList = ""
         if let peekedToken = tokenIterator.peek(), set(termTokens, contains: peekedToken) {
             expressionList += try parseExpression()
             while let peekedToken = tokenIterator.peek(), set([.symbol(",")], contains: peekedToken) {
-                expressionList += try tabs() + eat(expectedTokens: [.symbol(",")]).xml() + "\n"
+                try eat(expectedTokens: [.symbol(",")])
                 expressionList += try parseExpression()
             }
         }
-        indentLevel -= 1
-        expressionList += tabs() + "</expressionList>\n"
         return expressionList
     }
 
+    @discardableResult
     private static func eat(expectedTokens: Set<TokenType>) throws -> TokenType {
         guard let currentToken = tokenIterator.next() else {
             throw JackParserError.missingToken(expectedTokens: expectedTokens)
@@ -340,9 +298,5 @@ class JackParser {
         }
 
         return false
-    }
-
-    private static func tabs() -> String {
-        return String.init(repeating: " ", count: Int(indentLevel * 2))
     }
 }
